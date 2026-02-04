@@ -1,0 +1,44 @@
+A Python-based image editing application with a graphical user interface (GUI) built using Tkinter, OpenCV, and Pillow (PIL). This project demonstrates object-oriented programming concepts such as encapsulation, class interaction, and modular design. It allows users to load, edit, and save images with various effects, transformations, and adjustable settings.
+
+Features
+
+Operations of the file
+I ths option like Open, Save,Exit and Save As
+Supports JPG,PNG,and BMP formats
+Undo or Redo Options 
+It Tracks image changes with a history stack
+It will Undo and redo multiple steps
+It has various Image Effects
+It has option iGrayscale conversion
+It has Edge detection feature 
+It has Rotation in the degree of (90°, 180°, 270°)
+Flip (horizontal and vertical)
+It has adjustable Image Parameters
+Blur feature has intensity within 0–20 
+Brightness ranges from -100 to +100
+Contrast ranges from 0.5 to 3.0
+Resizing of the Image
+It has Custom width and height with handling of aspect ratio 
+It also has Reset features
+It will also has feaure to Rvert to original image
+It also has User Interface
+Itn also area for Central image display 
+It has Right sidebar with buttons and sliders in order to control it.
+It has Status bar which displays image dimensions, sizee, and filename
+It has Scrollable sidebar in order for  effects and settings
+
+Technical Details
+Language it uses for Programming is Python 3
+Libraries like Tkinter, OpenCV, Pillow (PIL), NumPy  used in order to operate it.
+
+Architecture:
+MainApp: GUI and user interaction
+ImageProcessor: Image transformations and adjustments
+ImageHistory: Undo and redo management
+
+Design Principles:
+
+Encapsulation: Internal state managed privately (processor, history, current_file, photo_ref)
+Constructor initialization: Sets up GUI, processors, and state variables
+
+Modular methods: Each user action (open, save, apply effect, resize) has a dedicated method
