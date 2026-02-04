@@ -1,0 +1,295 @@
+import cv2
+import numpy as np
+
+
+class ImageProcessor:
+    """
+    Core class which is responsibletoload,change and store images by use of  OpenCV.
+
+    This class will hwlp us to encapsulates all of our operations of image processing which is needed for our Software Now  Assignment 3.
+    It will help us to sustain  the present working image and has original reference  version.
+   Transformation Methods which for all used to save  the `image` attribute in internal  place and helps to a result of copy return which
+   will allow us integration safely with an history mechanism of undo or redo.
+
+    Principles for Key Decision:
+    • Encapsulation which means internal image data will not be public but kept private
+    • All methods will not be changed in  return value terms which always helps to return a copy.
+    • Input validation where there will behandling gracefully and also reasonable for the images which are missing.
+    • Color Space are consistent which each and every images will be kept in BGR Format(Default of Open CV)
+    • It will help  the eight extemely  transformations which needs top be performed in this image processor programming which is grayscale conversion,
+    gaussian blur,detection of canny edge,adjustment for brightness,adjusting contrast,rotation in various degrees,flip in vertical/horizontal way and
+    resizing in arbitrary dimensions. 
+      
+     Features
+    image  which will be reprented as  None or numpy.ndarray.
+        Current working image which is in BGR, shape (height, width, 3) and  dtype uint8
+    original_image which is shown in numpy.ndarray or None
+        The image copy  as it was loaded first which is be used for potential reset.
+
+    Interaction for Class
+    
+    • It will be called by ImageEditorApp to applying  effects of user-selected.
+    • It will returns image copies which can be stored in ImageHistory for the purpose of redo or undo.
+    • It will provide  get_image() in oder for safe access in current state.
+
+    Notes
+    • None will be returned in All Methods when  no image is loaded for pattern of fail-silent.
+    •Use various  color spaces for the purpose of brightness and contrast internally  like  Direct Scaling vs HSV
+    • Rotation wil be used for OpenCV flags in order to multiply  lossless 90°.
+    • Memory where each returned copy will consume ~width × height × 3 bytes
+    
+    """
+
+    def __init__(self):
+        """
+        It will start  an empty ImageProcessor.
+
+        `Image` and `Original_image`  will start as None.
+        Image is not loaded until `load_image()` will be called.
+        """
+        self.image = None
+        self.original_image = None
+
+    def load_image(self, filepath: str):
+        """
+        Loading  an  disk image which  uses OpenCV.
+
+        Conditions
+       
+        filepath : str which used oath to the image file which helps JPG, PNG, BMP, and most formats OpenCV can be read.
+
+        Returns
+        numpy.ndarray or None which is copy of the image which is loaded like BGR format or None when loading is failed
+
+        Raises
+    
+        ValueError which is if the file is not  read or image which are invalid
+
+        Side effects
+        
+        It sets both `self.image` and `self.original_image` which  copies the loaded data
+
+        ]
+        """
+        img = cv2.imread(filepath)
+        if img is None:
+            raise ValueError(f"Failed for loading image from: {filepath}")
+        self.image = img.copy()
+        self.original_image = img.copy()
+        return self.image.copy()
+
+    def grayscale(self):
+        """
+        Converting the present grayscale image  and changeto 3 channels which is BGR.
+
+        Returns
+        
+        numpy.ndarray or None which is the grayscale image copy (still 3-channel BGR) and  Nonewhen  no image loaded
+
+        Notes
+        It uses cv2.COLOR_BGR2GRAY → cv2.COLOR_GRAY2BGR such as the result  will show which remain compatible
+        with  operations of other colors and  display pipeline of Tkinter.
+        """
+        if self.image is None:
+            return None
+        gray = cv2.cvtColor(self.image, cv2.COLOR_BGR2GRAY)
+        result = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+        self.image = result
+        return result.copy()
+
+    def blur(self, intensity: int = 5):
+        """
+        Applying Gaussian blur with the help of intensity of user-controlled.
+
+        Conditions which is:
+        intensity for  int, default which is 5, Blur strength recommended for 1-20. Kernel size which is 2×intensity+1, 2×intensity+1
+
+        Returns
+        numpy.ndarray or None which is copy of the image which are blurred and None when no image isloaded
+
+        Raises
+        cv2.error when intensity will lead to kernel are invalid which is extremely rare with sane values
+
+        Notes
+        Higher values  which is equal to stronger blur. Sigma = 0 which is computed automatically.
+        """
+        if self.image is None:
+            return None
+        ksize = (intensity * 2 + 1, intensity * 2 + 1)
+        result = cv2.GaussianBlur(self.image, ksize, 0)
+        self.image = result
+        return result.copy()
+
+    def edge_detection(self):
+        """
+        It will apply Canny detection of edge  and converting  result to BGR image of 3-Channel.
+
+        Returns
+         None  ORnumpy.ndarray 
+            Copying  edge image which edges white on black and replicated to BGR) or none when there is no image
+
+        Notes
+        It uses thresholds whichb isfixed in  100 and 200 where are common defaults.
+        Result will be binary  then it is converted to 3-channel which displays consistinently.
+        """
+        if self.image is None:
+            return None
+        edges = cv2.Canny(self.image, 100, 200)
+        result = cv2.cvtColor(edges, cv2.COLOR_GRAY2BGR)
+        self.image = result
+        return result.copy()
+
+    def adjust_brightness(self, value: int = 0):
+        """
+        It increase or decrease image brightness which is in space for HSV Color.
+
+        Conditions
+        value : int, default=0 which is brightness delta (-127 to +127 which is recommended and clamped internally.
+
+        Returns
+        numpy.ndarray or None which is copy of image which are adjust ad None if no image loaded
+
+        Notes
+        It operates on V channel of HSV  which protects  saturation and hue.
+        Clips which values ranges in 0–255.
+        """
+        if self.image is None:
+            return None
+        hsv = cv2.cvtColor(self.image, cv2.COLOR_BGR2HSV)
+        h, s, v = cv2.split(hsv)
+        v = cv2.add(v, value)
+        v = np.clip(v, 0, 255).astype(np.uint8)
+        result = cv2.cvtColor(cv2.merge([h, s, v]), cv2.COLOR_HSV2BGR)
+        self.image = result
+        return result.copy()
+
+    def adjust_contrast(self, factor: float = 1.0):
+        """
+        Adjusting  image contrast which uses linear scaling .
+
+        Conditions
+        factor which is  float, default=1.0
+            Contrasting which is  multiplier for 0.2–3.0 recommended; <1 = lower, >1 = higher)
+
+        Returns
+        numpy.ndarray or None which is copy for theimage which is adjusted or None when  no image is loaded
+
+        Notes
+        It ses cv2.convertScaleAbs like alpha=factor and beta=0.
+        It may causes which clips values outside 0–255.
+        """
+        if self.image is None:
+            return None
+        result = cv2.convertScaleAbs(self.image, alpha=factor, beta=0)
+        self.image = result
+        return result.copy()
+
+    def rotate(self, angle_deg: int):
+        """
+        It will rotate by the image which is  90°, 180° or 270° which is clockwise.
+
+       Conclusion
+      
+        angle_deg : int
+            One of which is 90, 180, 270
+
+        Returns
+    
+        numpy.ndarray or None which is rotated image copy , or None image is not loaded
+ 
+        Raises
+        ValueError which is  if angle which is not  the supported values which is one.
+
+        Notes
+        It uses lossless rotation flags which is no interpolation.
+        It uses dimensions swap on rotations for 90 or 270 degree.
+        """
+        if self.image is None:
+            return None
+
+        if angle_deg == 90:
+            result = cv2.rotate(self.image, cv2.ROTATE_90_CLOCKWISE)
+        elif angle_deg == 180:
+            result = cv2.rotate(self.image, cv2.ROTATE_180)
+        elif angle_deg == 270:
+            result = cv2.rotate(self.image, cv2.ROTATE_90_COUNTERCLOCKWISE)
+        else:
+            raise ValueError("Supported angles which is  90, 180, 270 degrees")
+
+        self.image = result
+        return result.copy()
+
+    def flip(self, direction: str):
+        """
+        Fliping  image which is in  horizontal or vertical version.
+
+        Directions
+        Direction means str which is  "horizontal" or "vertical"
+
+        Return
+        None or numpy.ndarray 
+            It is copy of flipped image or none when there is no load of image 
+
+        Raises
+        
+        ValueError when direction is not valid
+        """
+        if self.image is None:
+            return None
+
+        if direction == "horizontal":
+            result = cv2.flip(self.image, 1)   # 1 will behorizontal
+        elif direction == "vertical":
+            result = cv2.flip(self.image, 0)   # 0  will be vertical
+        else:
+            raise ValueError("Direction should  be 'horizontal' or 'vertical'")
+
+        self.image = result
+        return result.copy()
+
+    def resize(self, width: int, height: int):
+        """
+        Resizing  image so that we can confirm targetingdi mensions.
+
+        Conditions
+        width  isint is target width in pixels greater than 0
+        height is int whereb target height in pixels is greater than 0
+
+        Returns
+        None or  numpy.ndarray 
+             Resized image copy  or None when no image is loaded
+
+        Raises
+
+        cv2.error when  width or height less or equal to 0
+        """
+        if self.image is None:
+            return None
+        if width <= 0 or height <= 0:
+            raise ValueError("Width and height should  be positive")
+
+        result = cv2.resize(self.image, (width, height), interpolation=cv2.INTER_LINEAR)
+        self.image = result
+        return result.copy()
+
+    def get_image(self):
+        """
+        Getting  a safe copy of the presnt image.
+
+        Returns
+        
+         None or numpy.ndarray  which is copy of internal image or None when no image is loaded
+        """
+        return self.image.copy() if self.image is not None else None
+
+    def reset_to_original(self):
+        """
+        Return to the loaded image which is original when one exists.
+
+        Returns
+        numpy.ndarray or None when copy of original image or  None when original one exists
+        """
+        if self.original_image is None:
+            return None
+        self.image = self.original_image.copy()
+        return self.image.copy()
