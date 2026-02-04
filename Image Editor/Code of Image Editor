@@ -1,1 +1,342 @@
+import tkinter as tk
+from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
+import cv2
+import os
+
+from image_processor import ImageProcessor
+from image_history import ImageHistory
+
+
+class MainApp(tk.Tk):
+    """
+    Main application class will create the Tkinter which is based on GUI which is used for editing image.
+
+    This class will serve as the entry point which will process our entire application.
+    It examplifies the ImageProcessor which is used for applying transforming image  and
+    ImageHistory which is used for undoing anjd redoing  functionality and also provide the user interface which is
+    used for necessary  elements foe our Software Now Assignment 3  assignment reuirements .
+
+    Key Features that we will implement are:
+    -Using  Main window  which has  appropriate and required size and title.
+    - It has Menu bar which that has options like File Open, Save, Save As and Exit and Edit which has Undo and Redo.
+    - Central image which displays area which uses Label widget
+    - Right sidebar is used with control panel with buttons so that it can be used for fixed effects
+    - Sliders with effects which are adjustable are used such as blur, brightness and contrast.
+    - Resizing  inputs with the use of Apply button
+    - Status bar which shows image dimensions and filenames.
+    - File dialogs  will be used for loading and saving JPG,PNG and BMP images.
+    - Message boxes for Errors,Feedback of User and Confirmation are shown in Message Boxes
+    - ImageProcessor and ImageHistory classes will be integrated.
+
+    Demonstration Concept of OOP:
+    - Encapsulation used as internal state which are options like processor, history, widgets and current_files which is  privately managed.
+    - Constructor (__init__)is used for starting Window,GUI and Core Objects
+    - Methods in which each user gives action like open,apply effect, undo and save  is a dedicated method
+    - Class Interaction will calls methods on  objects like ImageHistory and ImageProcessor.
+
+    Use of Programming: 
+        It is used to run this file directly which is used for the application launch:
+        python main.py
+
+    Notes to be taken for this ImageEditor:
+        - Image display is used automatically for resizing in order  fit the window which helps in order to preserve  aspect ratio
+        - All transformations will be recorded in history in order to undo and redo
+        - Error handling will be used in  messagebox so that we can  feedback which is user freindly.
+        - Status bar updates which shows dynamically in order to loador modify the image.
+
+    Warnings that needs to be taken care for this ImageEditor:
+        - OpenCV,Requires Pilloe(PIL) and NumPy is required to be installed
+        - Large images can  slow down on its  low-end machines so that there is no advanced optimization
+        - No zoom/pan  will be executed to that it can be added for enhancement in future.
+    """
+
+    def __init__(self):
+        """
+        It starts the Window for ImageEditorApp  and its important features.
+
+        It will set up the root window for Tkinter, geometry, processor,title  and history objects,
+        and which calls for the construction method of GUI. It starts the  state variables such as current 
+        current_file and reference of photo.
+
+        There is no requirement of photo.
+        """
+        super().__init__()
+        self.title("Image Editor - HIT137 Assignment 3")
+        self.geometry("1400x800")
+        self.minsize(1200, 700)
+
+        self.processor = ImageProcessor()
+        self.history = ImageHistory(limit=8)
+        self.current_file = None
+        self.photo_ref = None  # keep reference to avoid GC
+
+        self._build_menu()
+        self._build_ui()
+
+    def _build_menu(self):
+        menubar = tk.Menu(self)
+        filemenu = tk.Menu(menubar, tearoff=0)
+        filemenu.add_command(label="Open", command=self.open_image)
+        filemenu.add_command(label="Save", command=self.save_image)
+        filemenu.add_command(label="Save As", command=self.save_as_image)
+        filemenu.add_separator()
+        filemenu.add_command(label="Exit", command=self.quit)
+        menubar.add_cascade(label="File", menu=filemenu)
+
+        editmenu = tk.Menu(menubar, tearoff=0)
+        editmenu.add_command(label="Undo", command=self.undo)
+        editmenu.add_command(label="Redo", command=self.redo)
+        menubar.add_cascade(label="Edit", menu=editmenu)
+
+        self.config(menu=menubar)
+
+    def _build_ui(self):
+        # Status bar (pack first at bottom)
+        self.status_var = tk.StringVar(value="Ready | No image loaded")
+        status = tk.Label(self, textvariable=self.status_var, bg="#1e1e1e", fg="#aaaaaa",
+                          anchor="w", padx=10, pady=4, relief=tk.SUNKEN)
+        status.pack(side=tk.BOTTOM, fill=tk.X)
+
+        # Sidebar container with fixed width (pack second on right)
+        sidebar_container = tk.Frame(self, width=280, bg="#2d2d2d")
+        sidebar_container.pack(side=tk.RIGHT, fill=tk.Y)
+        sidebar_container.pack_propagate(False)
+        
+        # Image display area (pack last - will fill remaining space)
+        self.image_label = tk.Label(self, bg="#1e1e1e", text="No image loaded\nFile → Open to begin",
+                                    fg="#cccccc", font=("Arial", 12))
+        self.image_label.pack(expand=True, fill=tk.BOTH, padx=12, pady=12)
+
+        # Create canvas for scrolling
+        canvas = tk.Canvas(sidebar_container, bg="#2d2d2d", highlightthickness=0, width=260)
+        scrollbar = tk.Scrollbar(sidebar_container, orient="vertical", command=canvas.yview)
+        
+        # Create the actual sidebar frame inside canvas
+        sidebar = tk.Frame(canvas, bg="#2d2d2d", padx=10, pady=10)
+        
+        # Configure scrolling
+        sidebar.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
+        
+        canvas.create_window((0, 0), window=sidebar, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack canvas and scrollbar
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
+        
+        # Mouse wheel scrolling
+        def _on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        canvas.bind_all("<MouseWheel>", _on_mousewheel)
+
+        # Build sidebar content
+        tk.Label(sidebar, text="Effects", fg="white", bg="#2d2d2d", font=("Arial", 11, "bold")).pack(pady=(10, 5))
+
+        btn_cfg = {"width": 18, "pady": 3}
+        tk.Button(sidebar, text="Grayscale", command=self.apply_grayscale, **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Edge Detection", command=self.apply_edge_detection, **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Rotate 90°", command=lambda: self.apply_rotate(90), **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Rotate 180°", command=lambda: self.apply_rotate(180), **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Rotate 270°", command=lambda: self.apply_rotate(270), **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Flip Horizontal", command=lambda: self.apply_flip("horizontal"), **btn_cfg).pack(pady=2)
+        tk.Button(sidebar, text="Flip Vertical", command=lambda: self.apply_flip("vertical"), **btn_cfg).pack(pady=2)
+
+        tk.Label(sidebar, text="Adjustable", fg="white", bg="#2d2d2d", font=("Arial", 10, "bold")).pack(pady=(15, 5))
+
+        tk.Label(sidebar, text="Blur Intensity (0-20)", fg="#bbbbbb", bg="#2d2d2d").pack(anchor="w")
+        self.blur_slider = tk.Scale(sidebar, from_=0, to=20, orient=tk.HORIZONTAL, command=self.apply_blur)
+        self.blur_slider.set(0)
+        self.blur_slider.pack(fill=tk.X, pady=2)
+
+        tk.Label(sidebar, text="Brightness (-100 to +100)", fg="#bbbbbb", bg="#2d2d2d").pack(anchor="w")
+        self.brightness_slider = tk.Scale(sidebar, from_=-100, to=100, orient=tk.HORIZONTAL, command=self.apply_brightness)
+        self.brightness_slider.set(0)
+        self.brightness_slider.pack(fill=tk.X, pady=2)
+
+        tk.Label(sidebar, text="Contrast (0.5 to 3.0)", fg="#bbbbbb", bg="#2d2d2d").pack(anchor="w")
+        self.contrast_slider = tk.Scale(sidebar, from_=0.5, to=3.0, resolution=0.1, orient=tk.HORIZONTAL, command=self.apply_contrast)
+        self.contrast_slider.set(1.0)
+        self.contrast_slider.pack(fill=tk.X, pady=2)
+
+        tk.Label(sidebar, text="Resize (pixels)", fg="#bbbbbb", bg="#2d2d2d").pack(anchor="w", pady=(12,0))
+        resize_frame = tk.Frame(sidebar, bg="#2d2d2d")
+        resize_frame.pack(fill=tk.X, pady=4)
+        self.width_var = tk.StringVar(value="800")
+        self.height_var = tk.StringVar(value="600")
+        tk.Entry(resize_frame, textvariable=self.width_var, width=10).pack(side=tk.LEFT, padx=3)
+        tk.Label(resize_frame, text=" × ", fg="white", bg="#2d2d2d").pack(side=tk.LEFT)
+        tk.Entry(resize_frame, textvariable=self.height_var, width=10).pack(side=tk.LEFT, padx=3)
+        tk.Button(sidebar, text="Apply Resize", command=self.apply_resize, width=18).pack(pady=6)
+
+        tk.Button(sidebar, text="Reset to Original", command=self.reset_to_original, width=18).pack(pady=10)
+
+        # Add bottom padding for scrolling
+        tk.Label(sidebar, text="", bg="#2d2d2d").pack(pady=20)
+
+    def show_image(self):
+        img = self.processor.get_image()
+        if img is None:
+            self.image_label.config(image="", text="No image loaded")
+            self.status_var.set("No image loaded | Ready")
+            return
+
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        pil_img = Image.fromarray(rgb)
+
+        # Fit to available space (leave room for sidebar)
+        max_w = self.winfo_width() - 320
+        max_h = self.winfo_height() - 100
+        pil_img.thumbnail((max_w, max_h), Image.Resampling.LANCZOS)
+
+        self.photo_ref = ImageTk.PhotoImage(pil_img)
+        self.image_label.config(image=self.photo_ref, text="")
+
+        # Update status
+        fname = os.path.basename(self.current_file) if self.current_file else "Untitled"
+        h, w = img.shape[:2]
+        size_kb = os.path.getsize(self.current_file) // 1024 if self.current_file and os.path.exists(self.current_file) else 0
+        self.status_var.set(f"{fname} | {w} × {h} px | {size_kb:,} KB")
+
+    def commit_change(self):
+        current = self.processor.get_image()
+        if current is not None:
+            self.history.add_image(current)
+        self.show_image()
+
+    def open_image(self):
+        path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png *.bmp")])
+        if not path:
+            return
+        try:
+            self.processor.load_image(path)
+            self.current_file = path
+            self.history.clear()
+            self.history.add_image(self.processor.get_image())
+            self.show_image()
+        except Exception as e:
+            messagebox.showerror("Open Error", f"Could not load image:\n{str(e)}")
+
+    def save_image(self):
+        if self.processor.get_image() is None:
+            messagebox.showinfo("No Image", "Nothing to save.")
+            return
+        if self.current_file:
+            if messagebox.askyesno("Save", "Overwrite existing file?"):
+                if cv2.imwrite(self.current_file, self.processor.get_image()):
+                    messagebox.showinfo("Success", "Image saved.")
+                else:
+                    messagebox.showerror("Error", "Failed to save.")
+        else:
+            self.save_as_image()
+
+    def save_as_image(self):
+        if self.processor.get_image() is None:
+            return
+        path = filedialog.asksaveasfilename(
+            defaultextension=".jpg",
+            filetypes=[("JPEG", "*.jpg"), ("PNG", "*.png"), ("BMP", "*.bmp")]
+        )
+        if path:
+            if cv2.imwrite(path, self.processor.get_image()):
+                self.current_file = path
+                messagebox.showinfo("Success", "Image saved as new file.")
+                self.show_image()
+            else:
+                messagebox.showerror("Error", "Failed to save image.")
+
+    # Effect wrappers
+    def apply_grayscale(self):
+        if self.processor.get_image() is None:
+            messagebox.showinfo("No Image", "Open an image first.")
+            return
+        self.processor.grayscale()
+        self.commit_change()
+
+    def apply_edge_detection(self):
+        if self.processor.get_image() is None:
+            return
+        self.processor.edge_detection()
+        self.commit_change()
+
+    def apply_blur(self, val):
+        if self.processor.get_image() is None:
+            return
+        self.processor.blur(int(float(val)))
+        self.commit_change()
+
+    def apply_brightness(self, val):
+        if self.processor.get_image() is None:
+            return
+        self.processor.adjust_brightness(int(float(val)))
+        self.commit_change()
+
+    def apply_contrast(self, val):
+        if self.processor.get_image() is None:
+            return
+        self.processor.adjust_contrast(float(val))
+        self.commit_change()
+
+    def apply_rotate(self, angle):
+        if self.processor.get_image() is None:
+            return
+        try:
+            self.processor.rotate(angle)
+            self.commit_change()
+        except ValueError as e:
+            messagebox.showerror("Rotation Error", str(e))
+
+    def apply_flip(self, direction):
+        if self.processor.get_image() is None:
+            return
+        try:
+            self.processor.flip(direction)
+            self.commit_change()
+        except ValueError as e:
+            messagebox.showerror("Flip Error", str(e))
+
+    def apply_resize(self):
+        if self.processor.get_image() is None:
+            messagebox.showinfo("No Image", "Open an image first.")
+            return
+        try:
+            w = int(self.width_var.get())
+            h = int(self.height_var.get())
+            self.processor.resize(w, h)
+            self.commit_change()
+        except ValueError:
+            messagebox.showerror("Invalid Size", "Please enter positive integer values for width and height.")
+
+    def reset_to_original(self):
+        img = self.processor.reset_to_original()
+        if img is not None:
+            self.history.clear()
+            self.history.add_image(img)
+            self.show_image()
+        else:
+            messagebox.showinfo("Reset", "No original image to reset to.")
+
+    def undo(self):
+        prev = self.history.undo()
+        if prev is not None:
+            self.processor.image = prev
+            self.show_image()
+        else:
+            messagebox.showinfo("Undo", "No more steps to undo.")
+
+    def redo(self):
+        next_img = self.history.redo()
+        if next_img is not None:
+            self.processor.image = next_img
+            self.show_image()
+        else:
+            messagebox.showinfo("Redo", "No more steps to redo.")
+
+
+if __name__ == "__main__":
+    app = MainApp()
+    app.mainloop()
 
