@@ -1,0 +1,7 @@
+Image History is a simple tool that helps an image editing app keep track of changes. Every time the user edits an image, 
+the class saves a safe copy of that version so they can move backward (undo) or forward (redo) through their edits. 
+  It manages these saved states using a list and a pointer that shows which version is currently active.
+  If the user undoes a step and then makes a new edit, the class automatically clears the “future” history to keep everything consistent. 
+  It also has a limit on how many versions it stores to avoid using too much memory. Overall, 
+  it provides a clean and reliable way to manage image history using NumPy image arrays.
+  
