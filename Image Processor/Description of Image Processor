@@ -1,0 +1,11 @@
+It is an image processing processing core which handles loading, editing and storage of images using OpenCV and NumPy.
+It facilitates all the processing of images with openCV and NumPy.
+It loads pictures as well as archives the original and current photo.
+It uses image filters like grayscale, blur and edge detect.
+It alters the brightness and contrast of the images.
+It flips the images by 90 deg, 180 deg and 270 deg.
+It flips the image in horizontal and vertical way.
+It downsizes images with custom size.
+It stores pictures in the form of BGR to be consistent in processing.
+It restores the safe copy image in support of undo and redo.
+It follows encapsulation and modular method design.
