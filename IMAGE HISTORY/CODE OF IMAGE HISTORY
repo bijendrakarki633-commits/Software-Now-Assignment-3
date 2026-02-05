@@ -1,0 +1,144 @@
+lass ImageHistory:
+    """
+    It will manage history which is linear for states of image to help redo and undo operations for applications whose job is to do image editing.
+
+    This class will be responsible so that we can store copies of images at  various points of time which allows the user
+    undoor redo modifications done before. It will use a list for storing image states and
+    an index so that we can find its  the position right now in the history.
+
+    Decisions whihc we needed for Key Designs:
+    • For preventing external change which
+      affects stored history states every added images will stored and saved as deep copy.
+    • All  so called "future" states will be same  when most current  state will be modified  after an  undo will be done.
+    • Current_index = -1  will show  either are images added or not  which mshows the the history will start from zero.
+
+    Concepts of OOP shows us that:
+    • Encapsulation:  List and Index Internal History will be private. 
+    • (__init__) which plays the role of constructor.
+    • There should be clear contracts when there is Public Methods.
+    • Class interaction will return and receive arrays of NumPy which are basically used by ImageEditor and ImageProcessor App
+
+    Features:
+    _history which shows us the numpy.ndarray list
+         Deep Copies of Image Arrays such as BGR format, shape (h,w,3) and dtype uint8 which contains Private List.
+    _current_index is represented by int command
+        Present Position in the history.
+        -1 which means  empty history
+        0  which means first image
+        len(_history)-1 which shows most recent image
+
+    Methods we will use in this Image History Class Program: 
+    add_image(image)= It means to records a new image state (usually after an edit)
+    undo()
+        Moves one step backward in history and returns the previous image
+    redo()
+        Moves one step forward in history (if possible) and returns that image
+
+   
+
+    Warnings which needs to be considered:
+
+    • Passing of the same object arrays  various times with no copying externally can take us to unexpected
+      behavior which are unexpected if the caller will change  the array of ourn progam later.
+    • Very large images + many undo steps will consume large chunk of  memory in which each state is a full copy.
+    • It does not execute size limit of history which has potential of growing indefinite whcih is considered like  adding production of max_length.
+
+    This version is suitable for Software Now Assignment.
+    """
+
+    def __init__(self, limit=8):
+        """
+        It will start  an empty history of image.
+
+        After creation we will get :
+        • _history  which  [] in our programming
+        • _current_index = -1 which means no image is active right now
+
+        There is no requirement of any parameter.
+        """
+        self._history = []
+        self._current_index = -1
+        self._limit = limit
+
+    def add_image(self, image):
+        """
+        Adding a new state of  to the history .of this imagehistory class programming
+
+        Behavior which we will show2:
+        • When  user is not at the present state which is undid some steps) as all states of future will be discarded.
+        • *deep copy** of the input image will be stored to protect it from the latest changes made according to our programming function.
+        • The present index will  moved to latest addedpoint of state
+
+        Parameters which can be shown:
+        
+        image : numpy.ndarray
+            Image array which is seen OpenCV format like BGR, shape (height, width, 3) and  dtype uint8 should be none.
+
+        Raises which is seen :
+    
+        ValueError whiich means when means image is none or invalid array of 3-channel uint8 .
+
+        Returns will be none
+        
+        """
+        if image is None:
+            raise ValueError("Cannot add None as an image state")
+        if not isinstance(image, np.ndarray) or image.ndim != 3 or image.shape[2] != 3:
+            raise ValueError("Image must be 3-channel BGR numpy array")
+
+        # Truncate future if not at head
+        if self._current_index < len(self._history) - 1:
+            self._history = self._history[:self._current_index + 1]
+
+        # Add deep copy
+        self._history.append(np.copy(image))
+        self._current_index += 1
+
+        # Enforce limit
+        if len(self._history) > self._limit:
+            self._history.pop(0)
+            self._current_index -= 1
+
+    def undo(self):
+        """
+        Returning to the past image state when it is possible.
+
+        Behavior which is shown:
+        • Decrease in current_index if not done at the oldest state already.
+        •  A copy of the image resturns in latest position
+        • Returns  will be None if there is no possibility of undo
+
+        Returns are
+    
+        numpy.ndarray or None which menas copy of the image state from past , or None if npt undone in our image history class programming.
+
+       
+        """
+        if self._current_index <= 0:
+            return None
+        self._current_index -= 1
+        return np.copy(self._history[self._current_index])
+
+    def redo(self):
+        """
+        Moving further  to the upcomingimage state if an undo  has been performed in past in our programming.
+
+        Behavior which are seen :
+        • Increase in  current_index if  there is not already been done  at its latest state
+        •  A copy of image  will return at the fresh  new position
+        • None if no redo return will be  possible when it is already at its latest state
+
+        Returns
+        
+        numpy.ndarray or None which will becCopy of the upcoming image state or None which  cannot be redone
+
+        """
+        if self._current_index >= len(self._history) - 1:
+            return None
+        self._current_index += 1
+        return np.copy(self._history[self._current_index])
+
+    def clear(self):
+        """Clear the history and reset index"""
+        self._history = []
+        self._current_index = -1
