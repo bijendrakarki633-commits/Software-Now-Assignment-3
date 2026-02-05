@@ -1,4 +1,4 @@
-It is an image processing processing core which handles loading, editing and storage of images using OpenCV and NumPy.
+It is an image processing core which handles loading, editing and storage of images using OpenCV and NumPy.
 It facilitates all the processing of images with openCV and NumPy.
 It loads pictures as well as archives the original and current photo.
 It uses image filters like grayscale, blur and edge detect.
